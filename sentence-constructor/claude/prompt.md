@@ -89,5 +89,4 @@ When the input sounds like a question about language learning then we can assume
 ### Clues, Considerations, Next Steps
 - try and provide a non-nested bulleted list
 - talk about the vocabulary but try to leave out the japanese words because the student can refer to the vocabulary table.
-
-Student Input: Did you see the raven this morning? They were looking at our garden.
+- reference the considerations-examples file for good considerations examples

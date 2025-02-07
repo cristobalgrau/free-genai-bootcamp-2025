@@ -27,6 +27,8 @@ I will provide you with 4 prompts, you have to wait until the last one to execut
 
 This approach will work, but continuing to use Claude will quickly exhaust your daily quota. Unfortunately, with the Free Tier, this method is not viable for sustained use.
 
+![alt text](image-5.png)
+
 
 ### Prompting Guides
 

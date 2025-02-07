@@ -4,7 +4,9 @@
 
 Claude 3.5 Sonnet (free tier) 
 
-Since the free tier has limitations on handling large amounts of information in a single call, I’ve created the following prompt to allow Claude to process the information in separate parts and execute the instructions only after receiving all inputs:
+Since the free tier has limitations on handling large amounts of information in a single call, I’ve created the following Multifile Management Prompt to allow Claude to process the information in separate parts and execute the instructions only after receiving all inputs.
+
+**Multifile management Prompt**
 
 ```
 I will provide you with 4 prompts, you have to wait until the last one to execute the instructions. You will ask me for the 4 prompts in this order: Instructions, Examples, Sentence Structure Examples, and User Input.
@@ -28,6 +30,9 @@ I will provide you with 4 prompts, you have to wait until the last one to execut
 This approach will work, but continuing to use Claude will quickly exhaust your daily quota. Unfortunately, with the Free Tier, this method is not viable for sustained use.
 
 ![alt text](image-5.png)
+
+
+The Multifile Management Prompt can be adjusted to handle more example files, but the more prompt data you include, the faster your daily quota will be exhausted.
 
 
 ### Prompting Guides

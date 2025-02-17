@@ -16,6 +16,25 @@
 - There will no authentication or authorization
 - Everything be treated as a single user
 
+## Directory Structure
+
+```text
+backend/
+├── cmd/
+│   └── server.py       # Entry point for running the Flask App
+├── db/
+│   ├── migrations/     # SQL migration scripts
+│   └── seeds/          # JSON files for seeding initial database data
+├── internal/
+│   ├── handlers/       # API route handlers and request processing logic
+│   ├── middleware/     # for error handling
+│   └── models/         # ORM models representing database tables
+├── tasks/              # Custom task scripts (e.g., database initialization, migrations, seeding)
+├── config.py           # Configuration settings for the application
+└── requirements.txt
+ 
+```
+
 ## Database Schema
 
 The database will have following tables:

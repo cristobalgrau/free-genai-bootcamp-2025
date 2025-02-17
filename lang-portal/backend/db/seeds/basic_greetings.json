@@ -1,0 +1,20 @@
+[
+  {
+    "kanji": "こんにちは",
+    "romaji": "konnichiwa",
+    "english": "hello",
+    "parts": {
+      "type": "greeting",
+      "formality": "neutral"
+    }
+  },
+  {
+    "kanji": "さようなら",
+    "romaji": "sayounara",
+    "english": "goodbye",
+    "parts": {
+      "type": "greeting",
+      "formality": "formal"
+    }
+  }
+] 

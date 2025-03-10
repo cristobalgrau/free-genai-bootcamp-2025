@@ -1,16 +1,15 @@
 import streamlit as st
-from typing import Dict
-import json
-from collections import Counter
 import re
-
 import sys
 import os
+from datetime import datetime
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.get_transcript import YouTubeTranscriptDownloader
-
-from backend.chat import GeminiChat  # Changed from BedrockChat to GeminiChat
+from backend.chat import GeminiChat  
+from backend.structured_data import TranscriptStructurer
+from backend.vector_store import QuestionVectorStore
 
 
 # Page config
@@ -249,17 +248,334 @@ def render_structured_stage():
     """Render the structured data stage"""
     st.header("Structured Data Processing")
     
+    # Import datetime for file timestamps
+    import re
+    
+    # Create instance of the structurer
+    try:
+        structurer = TranscriptStructurer()
+    except Exception as e:
+        st.error(f"Error initializing structurer: {str(e)}")
+        return
+    
+    # Get list of transcripts and question files
+    try:
+        transcripts = structurer.get_available_transcripts()
+    except Exception as e:
+        st.error(f"Error listing transcripts: {str(e)}")
+        transcripts = []
+    
+    try:
+        question_files = [f for f in os.listdir(structurer.output_dir) 
+                        if f.endswith('_questions.txt')]
+    except Exception as e:
+        st.warning(f"Error listing question files: {str(e)}")
+        question_files = []
+    
+    # Create a mapping between transcripts and their processed question files
+    processed_transcripts = {}
+    for qfile in question_files:
+        # Extract the transcript name from the question file name (remove _questions.txt)
+        transcript_name = qfile.replace('_questions.txt', '.txt')
+        processed_transcripts[transcript_name] = qfile
+    
+    # Initialize session state for the first time without affecting widgets
+    if 'selected_transcript' not in st.session_state:
+        st.session_state.selected_transcript = transcripts[0] if transcripts else None
+    if 'selected_question_file' not in st.session_state:
+        st.session_state.selected_question_file = question_files[0] if question_files else None
+    
+    # Create two columns for the layout
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("Dialogue Extraction")
-        # Placeholder for dialogue processing
-        st.info("Dialogue extraction will be implemented here")
+        st.subheader("Process Transcripts")
         
+        if not transcripts:
+            st.warning("No transcript files found in the transcripts directory.")
+        else:
+            # Format function to show processed status
+            def format_transcript(transcript):
+                # Initialize vector store
+                from backend.vector_store import QuestionVectorStore
+                vs = QuestionVectorStore()
+                
+                if vs.has_transcript(transcript):
+                    return f"{transcript} [In Vector Store]"
+                elif transcript in processed_transcripts:
+                    return f"{transcript} [Processed]"
+                return transcript
+            
+            # Callback for when transcript selection changes
+            def on_transcript_change():
+                transcript = st.session_state.transcript_selector
+                st.session_state.selected_transcript = transcript
+                
+                # If this transcript has a processed question file, select it
+                if transcript in processed_transcripts:
+                    st.session_state.selected_question_file = processed_transcripts[transcript]
+                else:
+                    # If not processed, set to None to indicate no question file
+                    st.session_state.selected_question_file = None
+            
+            # Select index for transcript selector
+            if st.session_state.selected_transcript in transcripts:
+                transcript_index = transcripts.index(st.session_state.selected_transcript)
+            else:
+                transcript_index = 0
+            
+            # Show dropdown to select a transcript
+            selected_transcript = st.selectbox(
+                "Select Transcript",
+                options=transcripts,
+                format_func=format_transcript,
+                key="transcript_selector",
+                on_change=on_transcript_change,
+                index=transcript_index
+            )
+            
+            # Show information about the selected transcript
+            if selected_transcript:
+                transcript_path = os.path.join(structurer.transcript_dir, selected_transcript)
+                if os.path.exists(transcript_path):
+                    file_size = os.path.getsize(transcript_path) / 1024  # KB
+                    modified_time = os.path.getmtime(transcript_path)
+                    modified_date = datetime.fromtimestamp(modified_time).strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # Check vector store status
+                    vs = QuestionVectorStore()
+                    is_in_vectorstore = vs.has_transcript(selected_transcript)
+                    
+                    # Display file info with processing status
+                    info_text = f"Selected: **{selected_transcript}** ({file_size:.1f} KB, modified: {modified_date})"
+                    if is_in_vectorstore:
+                        info_text += " - **Stored in Vector DB**"
+                    elif selected_transcript in processed_transcripts:
+                        info_text += " - **Already processed**"
+                    else:
+                        info_text += " - **Not processed yet**"
+                    st.info(info_text)
+                    
+                    # Process selected transcript
+                    if st.button("Extract Questions", key="process_button"):
+                        with st.spinner("Extracting questions using Gemini API..."):
+                            try:
+                                # Process the transcript
+                                success, questions = structurer.process_transcript(selected_transcript)
+                                
+                                if success:
+                                    # Store in session state for display
+                                    st.session_state.processed_transcript = selected_transcript
+                                    st.session_state.extracted_questions = questions
+                                    
+                                    # Update the processed transcripts mapping
+                                    question_file = f"{selected_transcript.replace('.txt', '')}_questions.txt"
+                                    processed_transcripts[selected_transcript] = question_file
+                                    
+                                    # Update the question file selection
+                                    st.session_state.selected_question_file = question_file
+                                    
+                                    st.success(f"Successfully extracted {len(questions)} questions!")
+                                    st.rerun()  # Refresh to show updated status
+                                else:
+                                    st.error("Failed to process transcript.")
+                            except Exception as e:
+                                st.error(f"Error processing transcript: {str(e)}")
+                                st.exception(e)
+    
     with col2:
-        st.subheader("Data Structure")
-        # Placeholder for structured data view
-        st.info("Structured data view will be implemented here")
+        st.subheader("View Questions")
+        
+        # Check if questions exist in structured data or vector store
+        selected_transcript = st.session_state.selected_transcript
+        vs = QuestionVectorStore()
+        is_in_vectorstore = vs.has_transcript(selected_transcript)
+        
+        if is_in_vectorstore:
+            # First try to get questions from session state to avoid API calls
+            if hasattr(st.session_state, 'extracted_questions') and st.session_state.processed_transcript == selected_transcript:
+                questions = st.session_state.extracted_questions
+                st.success(f"Found {len(questions)} questions from structured data.")
+                show_extracted_questions(questions)
+            else:
+                # Fallback to vector store if not in session
+                questions = vs.get_questions_for_transcript(selected_transcript)
+                st.success(f"Found {len(questions)} questions in vector store.")
+                show_extracted_questions(questions)
+        else:
+            st.info("No processed questions found. Process a transcript first.")
+
+def show_extracted_questions(questions):
+    """Display questions from structured data"""
+    if questions:
+        # Let user select which question to view
+        question_index = st.selectbox(
+            "Select Question to View",
+            options=range(len(questions)),
+            format_func=lambda i: f"Question {i+1}",
+            key="question_selector"
+        )
+        
+        if question_index is not None:
+            question = questions[question_index]
+            
+            # Display the question in a structured format
+            st.markdown("### Question Content")
+            
+            st.markdown("**Introduction:**")
+            st.text(question['introduction'].strip())
+            
+            st.markdown("**Conversation:**")
+            st.text(question['conversation'].strip())
+            
+            st.markdown("**Question:**")
+            st.text(question['question'].strip())
+            
+            st.markdown("**Options:**")
+            options_lines = question['options'].split('\n')
+            for option in options_lines:
+                st.text(option.strip())
+
+def show_question_browser(question_files, processed_transcripts, structurer):
+    """Display the question file selection and browser"""
+    import re
+    
+    # Determine the correct index for question file selection
+    question_file_index = 0
+    if st.session_state.selected_question_file in question_files:
+        question_file_index = question_files.index(st.session_state.selected_question_file)
+    
+    # Callback for when question file selection changes
+    def on_question_file_change():
+        question_file = st.session_state.question_file_selector
+        st.session_state.selected_question_file = question_file
+        
+        # Find the corresponding transcript
+        for transcript, qfile in processed_transcripts.items():
+            if qfile == question_file:
+                st.session_state.selected_transcript = transcript
+                break
+    
+    # Show dropdown to select a question file
+    selected_file = st.selectbox(
+        "Select Question File", 
+        options=question_files,
+        key="question_file_selector",
+        on_change=on_question_file_change,
+        index=question_file_index
+    )
+    
+    if selected_file:
+        show_question_file(selected_file, structurer)
+
+def show_question_file(selected_file, structurer):
+    """Display the contents of a question file or vector store questions"""
+    from backend.vector_store import QuestionVectorStore
+    vs = QuestionVectorStore()
+    
+    # Check if questions exist in vector store
+    if vs.has_transcript(selected_file):
+        questions = vs.get_questions_for_transcript(selected_file)
+        
+        if questions:
+            st.success(f"Found {len(questions)} questions in vector store.")
+            
+            # Let user select which question to view
+            question_index = st.selectbox(
+                "Select Question to View",
+                options=range(len(questions)),
+                format_func=lambda i: f"Question {i+1}",
+                key="question_selector"
+            )
+            
+            if question_index is not None:
+                question = questions[question_index]
+                
+                # Display the question in a structured format
+                st.markdown("### Question Content")
+                
+                st.markdown("**Introduction:**")
+                st.text(question['introduction'].strip())
+                
+                st.markdown("**Conversation:**")
+                st.text(question['conversation'].strip())
+                
+                st.markdown("**Question:**")
+                st.text(question['question'].strip())
+                
+                st.markdown("**Options:**")
+                options_lines = question['options'].split('\n')
+                for option in options_lines:
+                    st.text(option.strip())
+        else:
+            st.warning("No questions found in the vector store.")
+        return
+
+    # If not in vector store, fall back to original file reading logic
+    file_path = os.path.join(structurer.output_dir, selected_file)
+    # Read the contents of the file
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Parse the questions
+        question_blocks = re.findall(r'<question>(.*?)</question>', content, re.DOTALL)
+        
+        if question_blocks:
+            st.success(f"Found {len(question_blocks)} questions in file.")
+            
+            # Let user select which question to view
+            question_index = st.selectbox(
+                "Select Question to View",
+                options=range(len(question_blocks)),
+                format_func=lambda i: f"Question {i+1}",
+                key="question_selector"
+            )
+            
+            if question_index is not None:
+                # Get the selected question block
+                question_block = question_blocks[question_index]
+                
+                # Display the question in a more structured format
+                st.markdown("### Question Content")
+                
+                # Extract sections using regex
+                intro_match = re.search(r'Introduction:\s*(.*?)(?=\s*\n\s*Conversation:)', question_block, re.DOTALL)
+                conv_match = re.search(r'Conversation:\s*(.*?)(?=\s*\n\s*Question:)', question_block, re.DOTALL)
+                quest_match = re.search(r'Question:\s*(.*?)(?=\s*\n\s*Options:)', question_block, re.DOTALL)
+                options_match = re.search(r'Options:\s*(.*?)$', question_block, re.DOTALL)
+                
+                # Display each section in a structured way
+                st.markdown("**Introduction:**")
+                if intro_match:
+                    st.text(intro_match.group(1).strip())
+                else:
+                    st.warning("Introduction section not found.")
+                
+                st.markdown("**Conversation:**")
+                if conv_match:
+                    st.text(conv_match.group(1).strip())
+                else:
+                    st.warning("Conversation section not found.")
+                
+                st.markdown("**Question:**")
+                if quest_match:
+                    st.text(quest_match.group(1).strip())
+                else:
+                    st.warning("Question section not found.")
+                
+                st.markdown("**Options:**")
+                if options_match:
+                    options_text = options_match.group(1).strip()
+                    options_lines = options_text.split('\n')
+                    for option in options_lines:
+                        st.text(option)
+                else:
+                    st.warning("Options section not found.")
+        else:
+            st.warning("No questions found in the selected file.")
+    except Exception as e:
+        st.error(f"Error reading question file: {str(e)}")
 
 def render_rag_stage():
     """Render the RAG implementation stage"""

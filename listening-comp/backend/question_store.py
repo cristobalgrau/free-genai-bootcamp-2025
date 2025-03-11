@@ -4,10 +4,16 @@ from datetime import datetime
 
 class QuestionStore:
     def __init__(self):
-        self.store_path = os.path.join(os.path.dirname(__file__), 'stored_questions.json')
+        # Create data directory path inside backend folder
+        backend_dir = os.path.dirname(__file__)
+        self.data_dir = os.path.join(backend_dir, 'data')
+        self.store_path = os.path.join(self.data_dir, 'stored_questions.json')
         self._ensure_store_exists()
 
     def _ensure_store_exists(self):
+        # Create data directory if it doesn't exist
+        os.makedirs(self.data_dir, exist_ok=True)
+        
         if not os.path.exists(self.store_path):
             with open(self.store_path, 'w') as f:
                 json.dump([], f)
@@ -44,3 +50,4 @@ class QuestionStore:
             if question['id'] == question_id:
                 return question
         return None
+

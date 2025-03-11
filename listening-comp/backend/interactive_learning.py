@@ -59,22 +59,23 @@ def generate_question(gemini, vector_store, practice_type, max_retries=3):
             {context}
             
             Generate a {practice_type.lower()} question with the following components:
-            1. A brief introduction in Japanese
+            1. A brief introduction in Japanese only
             2. A Japanese conversation or vocabulary. Do not include the English translation
             3. A question about the content only in Japanese
             4. Exactly 4 multiple choice options only in Japanese. Do not include English translations.
+            5. Do not include any romaji or English text in the question components.
             
             The question should test understanding of Japanese language concepts.
             
             Format the response with clear sections like:
             Introduction:
-            [introduction text in Japanese Kanji]
+            [introduction text only in Japanese Kanji]
             
             Conversation:
-            [Japanese Kanji text]
+            [Japanese Kanji text only]
             
             Question:
-            [question text in Kanji Japanese]
+            [question text in Kanji Japanese only]
             
             Options:
             A) [option text only in Kanji Japanese]

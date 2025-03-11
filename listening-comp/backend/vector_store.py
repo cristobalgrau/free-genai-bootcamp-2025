@@ -35,6 +35,22 @@ class QuestionVectorStore:
         # Initialize embedding model
         self.embedding_model = EMBEDDING_MODEL
         self.client = genai.Client(api_key=self.api_key)
+        
+        # Mock data for different practice types
+        self.mock_data = {
+            "japanese dialogue": [
+                "A: こんにちは。お元気ですか？\nB: はい、元気です。\n(Hello. How are you?\nYes, I'm fine.)",
+                "A: お名前は何ですか？\nB: 田中です。\n(What is your name?\nI'm Tanaka.)"
+            ],
+            "japanese vocabulary": [
+                "食べる (taberu) - to eat\n飲む (nomu) - to drink",
+                "行く (iku) - to go\n来る (kuru) - to come"
+            ],
+            "japanese listening": [
+                "Basic greetings: おはようございます (ohayou gozaimasu) - Good morning",
+                "Numbers: 一 (ichi) - one, 二 (ni) - two, 三 (san) - three"
+            ]
+        }
     
     def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for text using Google's embedding model"""        
@@ -129,3 +145,17 @@ class QuestionVectorStore:
             include=['metadatas']
         )
         return results['metadatas']
+    
+    def search(self, query: str, n_results: int = 2) -> str:
+        """
+        Search for relevant learning materials based on practice type
+        Args:
+            query: The practice type to search for
+            n_results: Number of results to return
+        Returns:
+            String containing relevant learning materials
+        """
+        if query in self.mock_data:
+            results = self.mock_data[query][:n_results]
+            return "\n\n".join(results)
+        return "No materials found for this practice type."

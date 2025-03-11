@@ -10,6 +10,7 @@ from backend.get_transcript import YouTubeTranscriptDownloader
 from backend.chat import GeminiChat  
 from backend.structured_data import TranscriptStructurer
 from backend.vector_store import QuestionVectorStore
+from backend.interactive_learning import render_interactive_stage
 
 
 # Page config
@@ -599,50 +600,20 @@ def render_rag_stage():
         # Placeholder for LLM response
         st.info("Generated response will appear here")
 
-def render_interactive_stage():
-    """Render the interactive learning stage"""
-    st.header("Interactive Learning")
-    
-    # Practice type selection
-    practice_type = st.selectbox(
-        "Select Practice Type",
-        ["Dialogue Practice", "Vocabulary Quiz", "Listening Exercise"]
-    )
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.subheader("Practice Scenario")
-        # Placeholder for scenario
-        st.info("Practice scenario will appear here")
-        
-        # Placeholder for multiple choice
-        options = ["Option 1", "Option 2", "Option 3", "Option 4"]
-        selected = st.radio("Choose your answer:", options)
-        
-    with col2:
-        st.subheader("Audio")
-        # Placeholder for audio player
-        st.info("Audio will appear here")
-        
-        st.subheader("Feedback")
-        # Placeholder for feedback
-        st.info("Feedback will appear here")
-
 def main():
     render_header()
     selected_stage = render_sidebar()
     
     # Render appropriate stage
-    if selected_stage == "1. Chat with Gemini":
+    if (selected_stage == "1. Chat with Gemini"):
         render_chat_stage()
-    elif selected_stage == "2. Raw Transcript":
+    elif (selected_stage == "2. Raw Transcript"):
         render_transcript_stage()
-    elif selected_stage == "3. Structured Data":
+    elif (selected_stage == "3. Structured Data"):
         render_structured_stage()
-    elif selected_stage == "4. RAG Implementation":
+    elif (selected_stage == "4. RAG Implementation"):
         render_rag_stage()
-    elif selected_stage == "5. Interactive Learning":
+    elif (selected_stage == "5. Interactive Learning"):
         render_interactive_stage()
     
     # Debug section at the bottom

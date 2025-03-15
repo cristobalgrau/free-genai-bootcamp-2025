@@ -3,6 +3,9 @@ from typing import List, Dict
 import chromadb
 from google import genai
 from dotenv import load_dotenv
+import numpy as np
+from sklearn.metrics.pairwise import cosine_similarity
+
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 EMBEDDING_MODEL = "text-embedding-004"
@@ -146,16 +149,109 @@ class QuestionVectorStore:
         )
         return results['metadatas']
     
-    def search(self, query: str, n_results: int = 2) -> str:
+    def search(self, query, n_results=2, randomize=True):
         """
-        Search for relevant learning materials based on practice type
+        Search for relevant context using the query string.
+        
         Args:
-            query: The practice type to search for
+            query: Query string for similarity search
             n_results: Number of results to return
+            randomize: Whether to add randomization to results
+            
         Returns:
-            String containing relevant learning materials
+            str: Formatted context from similarity search
         """
-        if query in self.mock_data:
-            results = self.mock_data[query][:n_results]
+        if not self.has_embeddings():
+            return "No Japanese learning materials available."
+        
+        try:
+            # Create embedding for the query
+            query_embedding = self._create_embedding(query)
+            
+            # Convert to numpy array for similarity search
+            if isinstance(query_embedding, list):
+                query_embedding = np.array(query_embedding)
+            
+            # Get similar vectors using cosine similarity
+            results = []
+            
+            # Get more results than needed for potential randomization
+            search_results = n_results * 2 if randomize else n_results
+            similarities = cosine_similarity([query_embedding], self.embeddings)[0]
+            
+            # Get indices of top similar vectors
+            top_indices = np.argsort(similarities)[::-1][:search_results]
+            
+            # If randomization is enabled, select a mix of top results and some random ones
+            if randomize and len(top_indices) > n_results:
+                # Keep the top result for relevance
+                selected_indices = [top_indices[0]]
+                
+                # Select the rest with some randomness - mix of top and random picks
+                remaining_top = list(top_indices[1:])
+                np.random.shuffle(remaining_top)  # Use numpy's random instead of importing random
+                selected_indices.extend(remaining_top[:n_results-1])
+            else:
+                # Just take the top n_results
+                selected_indices = top_indices[:n_results]
+            
+            # Format the search results
+            for idx in selected_indices:
+                # Skip if similarity is too low
+                if similarities[idx] < 0.5:
+                    continue
+                    
+                question = self.questions[idx]
+                results.append(f"""EXAMPLE:
+    Introduction: {question['introduction']}
+    Conversation: {question['conversation']}
+    Question: {question['question']}
+    Options: {question['options']}
+    """)
+            
+            # Add additional context for variety if needed
+            if len(results) < n_results:
+                grammar_contexts = [
+                    """
+                    GRAMMAR CONTEXT:
+                    Common N5 grammar patterns:
+                    - は/が for topic/subject marking
+                    - を for direct objects
+                    - に for time, location, indirect objects
+                    - で for location of action, means
+                    - から/まで for from/to
+                    - Basic verb conjugation (present, past, negative)
+                    """,
+                    """
+                    VOCABULARY CONTEXT:
+                    Common N5 vocabulary themes:
+                    - Greetings and introductions
+                    - Numbers and counting
+                    - Time expressions
+                    - Daily activities
+                    - Food and dining
+                    - Transportation
+                    - Shopping
+                    """
+                ]
+                
+                # Add grammar contexts to fulfill the requested number
+                additional_needed = n_results - len(results)
+                for i in range(min(additional_needed, len(grammar_contexts))):
+                    results.append(grammar_contexts[i])
+            
             return "\n\n".join(results)
-        return "No materials found for this practice type."
+            
+        except Exception as e:
+            print(f"Error during vector search: {str(e)}")
+            return "Error retrieving Japanese learning materials."
+        
+    def has_embeddings(self):
+        """
+        Check if the vector store has any embeddings loaded.
+        
+        Returns:
+            bool: True if embeddings are loaded, False otherwise
+        """
+        # Check if embeddings attribute exists and has content
+        return hasattr(self, 'embeddings') and self.embeddings is not None and len(self.embeddings) > 0

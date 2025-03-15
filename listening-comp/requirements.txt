@@ -1,4 +1,6 @@
-dotenv
+python-dotenv
 streamlit
 google-genai
 youtube-transcript-api
+boto3
+scikit-learn
